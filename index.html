@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Data Produk Toko</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      padding: 10px;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    .form-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .form-container input,
+    .form-container button {
+      padding: 8px;
+      font-size: 14px;
+      flex: 1 1 150px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+      overflow-x: auto;
+      display: block;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    #importArea {
+      border: 2px dashed #888;
+      padding: 15px;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .form-container {
+        flex-direction: column;
+      }
+
+      .form-container input,
+      .form-container button {
+        width: 100%;
+      }
+
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+
+      thead tr {
+        display: none;
+      }
+
+      tbody tr {
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        background: #fafafa;
+      }
+
+      tbody td {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 4px;
+        border: none;
+        border-bottom: 1px solid #eee;
+      }
+
+      tbody td::before {
+        content: attr(data-label);
+        font-weight: bold;
+        width: 50%;
+        text-align: left;
+      }
+
+      tbody td:last-child {
+        border-bottom: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Data Produk Toko</h2>
+
+  <div class="form-container">
+    <input type="text" id="namaToko" placeholder="Nama Toko">
+    <input type="text" id="namaProduk" placeholder="Nama Produk">
+    <input type="text" id="linkProduk" placeholder="Link Produk">
+    <input type="number" id="terjual" placeholder="Terjual (30hr)">
+    <input type="number" id="harga" placeholder="Harga">
+    <input type="number" id="komisiPersen" placeholder="Komisi (%)">
+    <input type="text" id="keterangan" placeholder="Keterangan">
+    <button onclick="tambahBaris()">Tambah</button>
+    <button onclick="exportJSON()">Export ke JSON</button>
+    <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="importJSON(this)">
+    <button onclick="document.getElementById('fileInput').click()">Import dari JSON</button>
+  </div>
+
+  <table id="tabelProduk">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Nama Toko</th>
+        <th>Nama Produk</th>
+        <th>Link Produk</th>
+        <th>Terjual (30hr)</th>
+        <th>Harga</th>
+        <th>Komisi (Rp)</th>
+        <th>Komisi (%)</th>
+        <th>Keterangan</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="importArea" ondrop="dropHandler(event)" ondragover="event.preventDefault()">
+    Drag & Drop file JSON di sini
+  </div>
+
+  <script>
+    let nomorUrut = 1;
+
+    window.onload = () => {
+      const data = localStorage.getItem("dataProduk");
+      if (data) {
+        try {
+          loadData(JSON.parse(data));
+        } catch {}
+      }
+    };
+
+    function tambahBaris(toko = "", produk = "", link = "", terjual = "", harga = "", persen = "", keterangan = "") {
+      if (!toko) toko = document.getElementById('namaToko').value;
+      if (!produk) produk = document.getElementById('namaProduk').value;
+      if (!link) link = document.getElementById('linkProduk').value;
+      if (!terjual) terjual = document.getElementById('terjual').value;
+      if (!harga) harga = document.getElementById('harga').value;
+      if (!persen) persen = document.getElementById('komisiPersen').value;
+      if (!keterangan) keterangan = document.getElementById('keterangan').value;
+
+      const komisiRp = (parseFloat(harga) * parseFloat(persen) / 100).toFixed(2);
+      const tbody = document.querySelector("#tabelProduk tbody");
+      const row = tbody.insertRow();
+
+      const data = [
+        nomorUrut++,
+        toko,
+        produk,
+        `<a href="${link}" target="_blank">Link</a>`,
+        terjual,
+        harga,
+        komisiRp,
+        persen,
+        keterangan
+      ];
+
+      const headers = ["No", "Nama Toko", "Nama Produk", "Link Produk", "Terjual (30hr)", "Harga", "Komisi (Rp)", "Komisi (%)", "Keterangan"];
+
+      data.forEach((item, index) => {
+        const cell = row.insertCell();
+        cell.innerHTML = item;
+        cell.setAttribute("data-label", headers[index]);
+      });
+
+      const aksiCell = row.insertCell();
+      aksiCell.setAttribute("data-label", "Aksi");
+      aksiCell.innerHTML = `<button onclick="hapusBaris(this)">Hapus</button> <button onclick="editBaris(this)">Edit</button>`;
+
+      bersihkanInput();
+      simpanLocalStorage();
+    }
+
+    function bersihkanInput() {
+      document.querySelectorAll('.form-container input').forEach(input => input.value = "");
+    }
+
+    function hapusBaris(button) {
+      button.closest("tr").remove();
+      perbaruiNomor();
+      simpanLocalStorage();
+    }
+
+    function perbaruiNomor() {
+      const rows = document.querySelectorAll("#tabelProduk tbody tr");
+      nomorUrut = 1;
+      rows.forEach(row => {
+        row.cells[0].textContent = nomorUrut++;
+      });
+    }
+
+    function editBaris(button) {
+      const row = button.closest("tr");
+      const cells = row.getElementsByTagName('td');
+
+      document.getElementById('namaToko').value = cells[1].textContent;
+      document.getElementById('namaProduk').value = cells[2].textContent;
+      document.getElementById('linkProduk').value = cells[3].querySelector('a').href;
+      document.getElementById('terjual').value = cells[4].textContent;
+      document.getElementById('harga').value = cells[5].textContent;
+      document.getElementById('komisiPersen').value = cells[7].textContent;
+      document.getElementById('keterangan').value = cells[8].textContent;
+
+      row.remove();
+      simpanLocalStorage();
+    }
+
+    function simpanLocalStorage() {
+      const data = ambilDataTabel();
+      localStorage.setItem("dataProduk", JSON.stringify(data));
+    }
+
+    function ambilDataTabel() {
+      const rows = document.querySelectorAll("#tabelProduk tbody tr");
+      const data = [];
+      rows.forEach(row => {
+        data.push({
+          nama_toko: row.cells[1].textContent,
+          nama_produk: row.cells[2].textContent,
+          link_produk: row.cells[3].querySelector('a')?.href || "",
+          terjual: parseInt(row.cells[4].textContent) || 0,
+          harga: parseFloat(row.cells[5].textContent),
+          komisi_rp: parseFloat(row.cells[6].textContent),
+          komisi_persen: parseFloat(row.cells[7].textContent),
+          keterangan: row.cells[8].textContent
+        });
+      });
+      return data;
+    }
+
+    function exportJSON() {
+      const data = ambilDataTabel();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "data_produk.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function loadData(data) {
+      const tbody = document.querySelector("#tabelProduk tbody");
+      tbody.innerHTML = "";
+      nomorUrut = 1;
+      data.forEach(item => {
+        tambahBaris(
+          item.nama_toko,
+          item.nama_produk,
+          item.link_produk,
+          item.terjual,
+          item.harga,
+          item.komisi_persen,
+          item.keterangan
+        );
+      });
+    }
+
+    function importJSON(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          loadData(data);
+          simpanLocalStorage();
+        } catch {
+          alert("File JSON tidak valid");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function dropHandler(event) {
+      event.preventDefault();
+      const file = event.dataTransfer.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          loadData(data);
+          simpanLocalStorage();
+        } catch {
+          alert("File JSON tidak valid");
+        }
+      };
+      reader.readAsText(file);
+    }
+  </script>
+
+</body>
+</html>
